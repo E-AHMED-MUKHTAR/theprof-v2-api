@@ -1,0 +1,62 @@
+const express = require('express')
+const router = express.Router()
+const master = require("../controllers/master")
+router
+    .post("/login",
+        master.login
+    )
+router
+    .post("/Create/NewStudent",
+        master.CreateNewStudent
+    )
+router
+    .put("/Update/Student",
+        master.updateStudent
+    )
+router
+    .put(
+        "/Update/StudentActivationDate",
+        master.UpdateStudentActivationDate
+    )
+router
+    .post(
+        "/Create/Month",
+        master.CreateMonth
+    )
+router
+    .post(
+        "/Create/Lecture",
+        master.CreateLecture
+    )
+router
+    .post(
+        "/Create/Notification",
+        master.CreateNotification
+    )
+router
+    .post(
+        "/Create/Slider",
+        master.CreateSlider
+    )
+router
+    .delete(
+        "/Delete/Month",
+        master.deleteMonth
+    )
+router
+    .delete(
+        "/Delete/Lecture",
+        master.deleteLecture
+    )
+router
+    .delete(
+        "/Delete/Slider",
+        master.deleteSlider
+    )
+router
+    .delete(
+        "/Delete/Notification",
+        master.deleteNotification
+    )
+
+module.exports = router

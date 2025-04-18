@@ -1,0 +1,496 @@
+const asyncHand = require('express-async-handler');
+const userData = require("../models/users");
+const adminData = require('../models/teachers');
+const moment = require('moment');
+const login = asyncHand(async (req, res) => {
+  const { teacherPass, teacherID } = req.body;
+  if (!teacherID) {
+    return res.status(400).json({ message: "لم يتم توفير الرقم التعريفي" });
+  }
+  const findUser = await adminData.findOne({ teacherID });
+  if (!findUser) {
+    return res.status(404).json({ message: " المعلم غير موجود" });
+  }
+  if (!teacherPass) {
+    return res.status(400).json({ message: "لم يتم توفير كلمه مرور" });
+  } else if (findUser.teacherPass && findUser.teacherPass !== teacherPass) {
+    return res.status(403).json({ message: "كلمة المرور غير صحيحة" });
+  }
+  req.session.teacherID = teacherID;
+  req.session.teacherPass = teacherPass;
+  const students = await userData.find({ assignedTeacher: teacherID });
+  let activeCount = 0;
+  let expiredCount = 0;
+  const now = moment();
+  for (const student of students) {
+    const expire = moment(student.expireDate, "DD/MM/YYYY - hh:mm:ss A");
+    if (expire.isAfter(now)) {
+      if (student.codeStatus !== 'Active') {
+        student.codeStatus = 'Active';
+        await student.save();
+      }
+      activeCount++;
+    } else {
+      if (student.codeStatus !== 'Expired') {
+        student.codeStatus = 'Expired';
+        await student.save();
+      }
+      expiredCount++;
+    }
+  }
+  return res.status(200).json({
+    message: "تسجيل دخول ناجح",
+    data: {
+      teacher: findUser,
+      totalStudents: students.length,
+      activeStudents: activeCount,
+      expiredStudents: expiredCount,
+      availableClassesCount: findUser.availableClasses?.length || 0,
+      availableMonthsCount: findUser.availableMonths?.length || 0
+    }
+  });
+});
+
+const generateUniqueStudentCode = async () => {
+  let code;
+  let exists = true;
+  while (exists) {
+    code = Array.from({ length: 5 }, () => Math.floor(Math.random() * 10)).join('');
+    const existing = await userData.findOne({ studentCode: code });
+    if (!existing) exists = false;
+  }
+  return code;
+};
+const CreateNewStudent = asyncHand(async (req, res) => {
+  const { studentcash, studentgrade, studentname } = req.body;
+  if (!studentname || !studentCode || !studentcash) {
+    return res.status(400).json({ message: "الرجاء ادخال جميع البيانات" });
+  }
+  const teacherID = req.session.teacherID;
+  if (!teacherID) {
+    return res.status(401).json({ message: " لا يوجد جلسة" });
+  }
+  if (!studentcash || !studentgrade || !studentname) {
+    return res.status(400).json({ message: "نقص في البيانات" });
+  }
+  const studentCode = await generateUniqueStudentCode();
+  const activateDate = moment().format("DD/MM/YYYY - hh:mm:ss A");
+  const expireDate = moment().add(1, 'month').format("DD/MM/YYYY - hh:mm:ss A");
+  const newStudent = new userData({
+    deviceID: "",
+    studentCode,
+    studentName: studentname,
+    studentNumber: "",
+    studentGrade: studentgrade,
+    studentCash: studentcash,
+    boughtMonths: "",
+    assignedTeacher: teacherID,
+    activateDate,
+    expireDate,
+    codeStatus: "Active",
+    isCenter: "false",
+    watchedClasses: []
+  });
+  await newStudent.save();
+  return res.status(201).json({
+    message: " تم إنشاء الطالب بنجاح",
+    student: newStudent
+  });
+});
+const updateStudent = asyncHand(async (req, res) => {
+  const {
+    studentName,
+    studentCode,
+    studentNumber,
+    studentGrade,
+    studentCash
+  } = req.body;
+  if (!studentName || !studentCode || !studentNumber || !studentGrade || !studentCash) {
+    return res.status(400).json({ message: "الرجاء ادخال جميع البيانات" });
+  }
+  const teacherID = req.session.teacherID;
+  if (!teacherID) {
+    return res.status(401).json({ message: " لا يوجد جلسة" });
+  }
+  if (!studentCode) {
+    return res.status(400).json({ message: "نقص في البيانات" });
+  }
+  const student = await userData.findOne({ studentCode });
+  if (!student) {
+    return res.status(404).json({ message: "الطالب غير موجود" });
+  }
+  if (student.assignedTeacher !== teacherID) {
+    return res.status(403).json({ message: "ليس لك صلاحية تعديل هذا الطالب" });
+  }
+  if (studentName) student.studentName = studentName;
+  if (studentNumber) student.studentNumber = studentNumber;
+  if (studentGrade) student.studentGrade = studentGrade;
+  if (studentCash) student.studentCash = studentCash;
+  await student.save();
+  return res.status(200).json({
+    message: "تم التحديث بنجاح",
+    student
+  });
+});
+const UpdateStudentActivationDate = asyncHand(async (req, res) => {
+  const {
+    studentCode
+  } = req.body;
+  const teacherID = req.session.teacherID;
+  if (!teacherID) {
+    return res.status(401).json({ message: " لا يوجد جلسة" });
+  }
+  if (!studentCode) {
+    return res.status(400).json({ message: "نقص في البيانات" });
+  }
+  const student = await userData.findOne({ studentCode: studentCode });
+  if (!student) {
+    return res.status(404).json({ message: "الطالب غير موجود" });
+  }
+  if (student.assignedTeacher !== teacherID) {
+    return res.status(403).json({ message: "ليس لك صلاحية تعديل هذا الطالب" });
+  }
+  const newActivateDate = moment().format("DD/MM/YYYY - hh:mm:ss A");
+  const newExpireDate = moment().add(1, 'month').format("DD/MM/YYYY - hh:mm:ss A");
+  student.activateDate = newActivateDate;
+  student.expireDate = newExpireDate;
+  await student.save();
+  return res.status(200).json({
+    message: " تم تجديد المدة",
+    student
+  });
+});
+
+
+const CreateMonth = asyncHand(async (req, res) => {
+  const teacherID = req.session.teacherID;
+  const { name, grade, money, di, vi } = req.body;
+
+  if (!grade || !name || !money || !di || !vi) {
+    return res.status(400).json({ message: "الرجاء ادخال جميع البيانات" });
+  }
+
+  if (!teacherID) {
+    return res.status(401).json({ message: " لا يوجد جلسة" });
+  }
+
+
+  const teacher = await adminData.findOne({ teacherID });
+  if (!teacher) {
+    return res.status(404).json({ message: " المعلم غير موجود" });
+  }
+
+  let id = 1;
+  if (teacher.availableMonths && teacher.availableMonths.length > 0) {
+    const sameGradeMonths = teacher.availableMonths.filter(
+      (month) => month.grade === grade
+    );
+
+    if (sameGradeMonths.length > 0) {
+      const lastId = Math.max(...sameGradeMonths.map((month) => month.id));
+      id = lastId + 1;
+    }
+  }
+
+
+  const img = `https://raw.githubusercontent.com/the-prof-corporation/the-prof/refs/heads/main/Numbers/${id}.png`;
+
+  const newMonth = {
+    id,
+    name,
+    img,
+    grade,
+    money,
+    di,
+    vi
+  };
+
+  const updateResult = await adminData.findOneAndUpdate(
+    { teacherID },
+    {
+      $push: { availableMonths: newMonth }
+    },
+    { new: true, runValidators: true }
+  );
+
+  return res.status(201).json({
+    message: "تم الإضافة",
+    availableMonths: updateResult.availableMonths
+  });
+});
+
+const axios = require('axios');
+const cheerio = require('cheerio');
+
+const getYouTubeVideoId = (url) => {
+  const regex = /(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/|v\/))([\w-]{11})/;
+  const match = url.match(regex);
+  return match ? match[1] : null;
+};
+
+
+const getYouTubeVideoDetails = async (videoId) => {
+  const videoUrl = `https://www.youtube.com/watch?v=${videoId}`;
+  try {
+    const response = await axios.get(videoUrl);
+    const $ = cheerio.load(response.data);
+
+    const title = $('meta[name="title"]').attr('content');
+    const description = $('meta[name="description"]').attr('content');
+    const img = $('link[rel="image_src"]').attr('href');
+
+    return { title, description, img };
+  } catch (error) {
+    console.error("Error scraping video:", error.message);
+    return null;
+  }
+};
+
+
+const CreateLecture = asyncHand(async (req, res) => {
+  const teacherID = req.session.teacherID;
+  const { grade, monthId, exams, pdf, url } = req.body;
+
+  if (!grade || !monthId || !exams || !pdf || !url) {
+    return res.status(400).json({ message: "الرجاء ادخال جميع البيانات" });
+  }
+  
+  if (!teacherID) {
+    return res.status(401).json({ message: " لا يوجد جلسة" });
+  }
+
+  const videoId = getYouTubeVideoId(url);
+  if (!videoId) {
+    return res.status(400).json({ message: "رابط يوتيوب غير صالح" });
+  }
+
+  const videoDetails = await getYouTubeVideoDetails(videoId);
+  if (!videoDetails) {
+    return res.status(400).json({ message: "تعذر جلب بيانات الفيديو" });
+  }
+
+
+  const teacher = await adminData.findOne({ teacherID });
+  if (!teacher) {
+    return res.status(404).json({ message: " المعلم غير موجود" });
+  }
+
+
+  let id = 1;
+  if (teacher.availableClasses && teacher.availableClasses.length > 0) {
+    const sameGradeLectures = teacher.availableClasses.filter(
+      (cls) => cls.grade === grade
+    );
+
+    if (sameGradeLectures.length > 0) {
+      const lastId = Math.max(...sameGradeLectures.map((cls) => cls.id));
+      id = lastId + 1;
+    }
+  }
+
+  const newLecture = {
+    id,
+    videoId,
+    title: videoDetails.title,
+    description: videoDetails.description,
+    img: videoDetails.img,
+    grade,
+    monthId,
+    exams,
+    pdf,
+    url
+  };
+
+  const updateResult = await adminData.findOneAndUpdate(
+    { teacherID },
+    { $push: { availableClasses: newLecture } },
+    { new: true, runValidators: true }
+  );
+
+  return res.status(201).json({
+    message: "تم الإضافة",
+    availableClasses: updateResult.availableClasses
+  });
+});
+
+
+const CreateNotification = asyncHand(async (req, res) => {
+  const teacherID = req.session.teacherID;
+  const { msg, img, grade, ti, vi } = req.body;
+
+  if (!grade || !msg || !ti ) {
+    return res.status(400).json({ message: "نقص في البيانات" });
+  }
+
+  if (!teacherID) {
+    return res.status(401).json({ message: " لا يوجد جلسة" });
+  }
+
+  const date = moment().format("DD/MM/YYYY - hh:mm:ss A");
+  console.log(date)
+  const updateResult = await adminData.findOneAndUpdate(
+    { teacherID },
+    {
+      $push: {
+        teacherNotifications: {
+          date,
+          msg,
+          img,
+          grade,
+          ti,
+          vi
+        }
+      }
+    },
+    { new: true, runValidators: true }
+  );
+
+  if (!updateResult) {
+    return res.status(404).json({ message: " المعلم غير موجود" });
+  }
+
+  return res.status(201).json({
+    message: "تم الإضافة",
+    teacherNotifications: updateResult.teacherNotifications
+  });
+});
+
+const CreateSlider = asyncHand(async (req, res) => {
+  const teacherID = req.session.teacherID;
+  const {
+    id,
+    monthId,
+    img,
+    grade,
+    ti,
+    url
+  } = req.body;
+  if (!grade || !id || !monthId || !ti || !url || !img) {
+    return res.status(400).json({ message: "نقص في البيانات" });
+  }
+  if (!teacherID) {
+    return res.status(401).json({ message: " لا يوجد جلسة" });
+  }
+  const updateResult = await adminData.findOneAndUpdate(
+    { teacherID },
+    {
+      $push: { teacherSlider: { id, monthId, img, grade, ti, url } }
+    },
+    { new: true, runValidators: true }
+  );
+  if (!updateResult) {
+    return res.status(404).json({ message: " المعلم غير موجود" });
+  }
+  return res.status(201).json({
+    message: "تم الإضافة",
+    teacherSlider: updateResult.teacherSlider
+  });
+});
+const deleteMonth = asyncHand(async (req, res) => {
+  const teacherID = req.session.teacherID;
+  const {
+    grade,
+    id
+  } = req.body;
+  if (!teacherID) return res.status(401).json({ message: " لا يوجد جلسة" });
+  const updateResult = await adminData.findOneAndUpdate(
+    { teacherID },
+    {
+      $pull: {
+        availableMonths: { grade, id },
+        availableClasses: { grade, id }
+      }
+    },
+    { new: true }
+  );
+  if (!updateResult) return res.status(404).json({ message: " المعلم غير موجود" });
+  return res.status(200).json({
+    message: "تم الإضافة",
+    availableMonths: updateResult.availableMonths,
+    availableClasses: updateResult.availableClasses
+  });
+});
+const deleteLecture = asyncHand(async (req, res) => {
+  const teacherID = req.session.teacherID;
+  const {
+    monthId,
+    id
+  } = req.body;
+  if (!teacherID) return res.status(401).json({ message: " لا يوجد جلسة" });
+  if (monthId === undefined || id === undefined)
+    return res.status(400).json({ message: "نقص في البيانات" });
+  const updateResult = await adminData.findOneAndUpdate(
+    { teacherID },
+    {
+      $pull: {
+        availableClasses: { monthId, id }
+      }
+    },
+    { new: true }
+  );
+  if (!updateResult) return res.status(404).json({ message: " المعلم غير موجود" });
+  return res.status(200).json({
+    message: "تم حذف العنصر",
+    availableClasses: updateResult.availableClasses
+  });
+});
+const deleteSlider = asyncHand(async (req, res) => {
+  const teacherID = req.session.teacherID;
+  const {
+    monthId,
+    id
+  } = req.body;
+  if (!teacherID) return res.status(401).json({ message: " لا يوجد جلسة" });
+  if (monthId === undefined || id === undefined)
+    return res.status(400).json({ message: "نقص في البيانات" });
+  const updateResult = await adminData.findOneAndUpdate(
+    { teacherID },
+    {
+      $pull: { teacherSlider: { monthId, id } }
+    },
+    { new: true }
+  );
+  if (!updateResult) return res.status(404).json({ message: " المعلم غير موجود" });
+  return res.status(200).json({
+    message: "تم حذف العنصر",
+    teacherSlider: updateResult.teacherSlider
+  });
+});
+const deleteNotification = asyncHand(async (req, res) => {
+  const teacherID = req.session.teacherID;
+  const {
+    grade
+  } = req.body;
+  if (!teacherID) return res.status(401).json({ message: " لا يوجد جلسة" });
+  if (grade === undefined) return res.status(400).json({ message: "نقص في البيانات" });
+  const updateResult = await adminData.findOneAndUpdate(
+    { teacherID },
+    {
+      $pull: { teacherNotifications: { grade } }
+    },
+    { new: true }
+  );
+  if (!updateResult) return res.status(404).json({ message: " المعلم غير موجود" });
+  return res.status(200).json({
+    message: "تم حذف العنصر",
+    teacherNotifications: updateResult.teacherNotifications
+  });
+});
+
+module.exports = {
+  login,
+  CreateNewStudent,
+  updateStudent,
+  UpdateStudentActivationDate,
+  CreateMonth,
+  CreateLecture,
+  CreateNotification,
+  CreateSlider,
+  deleteMonth,
+  deleteLecture,
+  deleteSlider,
+  deleteNotification
+}
+
+
+
