@@ -7,6 +7,7 @@ const generateTeacherID = () => {
   }
   return teacherID;
 };
+
 const add = asyncHand(async (req, res) => {
   const { teacherNumber, teacherName, teacherPass } = req.body;
   if (!teacherNumber || !teacherName || !teacherPass) {
@@ -27,7 +28,7 @@ const add = asyncHand(async (req, res) => {
     });
     await newTeacher.save();
     return res.status(201).json({
-      message: "Teacher added successfully",
+      message: "تمت اضافه المدرس بنجاح ",
       data: newTeacher
     });
   } catch (error) {
