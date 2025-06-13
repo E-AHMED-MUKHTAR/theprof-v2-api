@@ -1,5 +1,7 @@
 const asyncHand = require('express-async-handler');
 const adminData = require('../models/teachers');
+const bcrypt = require('bcrypt');
+const { encrypt, decrypt } = require('../utilitie/cryptoUtil');
 const generateTeacherID = () => {
   let teacherID = "";
   while (teacherID.length < 4) {
@@ -7,7 +9,6 @@ const generateTeacherID = () => {
   }
   return teacherID;
 };
-
 const add = asyncHand(async (req, res) => {
   const { teacherNumber, teacherName, teacherPass } = req.body;
   if (!teacherNumber || !teacherName || !teacherPass) {
@@ -20,11 +21,12 @@ const add = asyncHand(async (req, res) => {
       teacherID = generateTeacherID();
       existingTeacher = await adminData.findOne({ teacherID });
     }
+    const encryptedPassword = await bcrypt.hash(teacherPass, 10)
     const newTeacher = new adminData({
-      teacherNumber,
+      teacherNumber: encrypt(teacherNumber).content,
       teacherName,
       teacherID,
-      teacherPass
+      teacherPass: encryptedPassword
     });
     await newTeacher.save();
     return res.status(201).json({
@@ -36,5 +38,4 @@ const add = asyncHand(async (req, res) => {
     return res.status(500).json({ message: "Failed to add teacher", error: error.message });
   }
 });
-
 module.exports = { add };

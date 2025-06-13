@@ -58,5 +58,15 @@ router
         "/Delete/Notification",
         master.deleteNotification
     )
+router
+    .get(
+        "/see/requested/from/student",
+        master.requestedList
+    )
+router
+    .post(
+        "/accept/requested/from/student",
+        master.acceptOneRequest
+    )
 
 module.exports = router

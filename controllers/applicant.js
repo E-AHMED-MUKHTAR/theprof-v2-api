@@ -5,23 +5,31 @@ const adminData = require('../models/teachers');
 const dayjs = require("dayjs");
 const customParseFormat = require("dayjs/plugin/customParseFormat");
 dayjs.extend(customParseFormat);
+const { encrypt, decrypt } = require('../utilitie/cryptoUtil');
+
+const moment = require('moment');
 const signIn = asyncHand(async (req, res) => {
   const { studentCode, deviceID } = req.body;
   if (!studentCode) {
-    return res.status(400).json({ message: "No studentCode provided" });
+    return res.status(400).json({ message: "كود مستخدم غير صالح" });
   }
   try {
     const findUser = await userData.findOne({ studentCode });
     if (!findUser) {
-      return res.status(404).json({ message: "Student not found" });
+      return res.status(404).json({ message: "طالب غير موجود" });
     }
-    if (!deviceID) {
-      return res.status(400).json({ message: "No device ID provided" });
+    else if (!deviceID) {
+      return res.status(400).json({ message: "حطأ بالهاتف المستخدم" });
     }
     else if (findUser.deviceID && findUser.deviceID !== deviceID) {
-      return res.status(403).json({ message: "You are logged in on another device!" });
+      return res.status(403).json({ message: "تم تسجيل الدخول بهاتف مختلف" });
     }
-    if (findUser.expireDate) {
+    else if (findUser.admissionStatus) {
+      if (findUser.admissionStatus === "Waiting") {
+        return res.status(200).json({ message: "في انتظار موافقه المدرس" });
+      }
+    }
+    else if (findUser.expireDate) {
       const expireDate = dayjs(findUser.expireDate, "DD/MM/YYYY - hh:mm:ss A");
       const now = dayjs();
       if (expireDate.isBefore(now)) {
@@ -29,7 +37,7 @@ const signIn = asyncHand(async (req, res) => {
           findUser.codeStatus = "Expired";
           await findUser.save();
         }
-        return res.status(400).json({ message: "Please renew your subscription." });
+        return res.status(400).json({ message: "الرجاء تجديد الاشتراك" });
       } else {
         if (findUser.codeStatus !== "Active") {
           findUser.codeStatus = "Active";
@@ -37,13 +45,18 @@ const signIn = asyncHand(async (req, res) => {
         }
       }
     }
+    else{
+      res.status(500).json({
+      message: "خطأ غير معروف برجاء ابلاغ المطوريين"
+    })
+  }
     findUser.deviceID = deviceID;
     await findUser.save();
     req.session.deviceID = deviceID;
     req.session.studentCode = studentCode;
     const checkedTeacher = await adminData.findOne({ teacherID: findUser.assignedTeacher });
     if (!checkedTeacher) {
-      return res.status(403).json({ message: "Assigned teacher not found" });
+      return res.status(403).json({ message: "المدرس المسجل غير موجود" });
     }
     const boughtMonths = (findUser.boughtMonths.match(/\d+/g) || []).map(Number);
     let boughtClasses = [];
@@ -54,7 +67,7 @@ const signIn = asyncHand(async (req, res) => {
         return classMonthId && boughtMonths.includes(classMonthId) && cls.grade === Number(studentGrade);
       });
     } else {
-      return res.status(500).json({ message: "Internal error", error: "Classes data corrupted" });
+      return res.status(500).json({ message: "حطأ داخلي في النظام", error: "تداخل في الحصص" });
     }
     const studentGrade = Number(findUser.studentGrade);
     let filteredMonths = [];
@@ -75,76 +88,130 @@ const signIn = asyncHand(async (req, res) => {
         return Number(note.grade) === Number(studentGrade);
       });
     }
+    
     return res.status(200).json({
-      message: "Login successful",
+      message: "تم تسجيل الدخول بنجاح",
       data: {
         ...findUser.toObject(),
+        studentNumber: decrypt({ content: findUser.studentNumber }),
         teacher: filteredMonths,
-        classes: boughtClasses,
         slider: filteredSlider,
-        notifications: filteredNotifications
+        notifications: filteredNotifications,
+        availableClasses: boughtClasses?.map(cls => ({
+          ...(cls._doc ? cls._doc : cls),
+          title: decrypt({ content: cls.title }),
+          description: decrypt({ content: cls.description }),
+          img: decrypt({ content: cls.img }),
+          url: decrypt({ content: cls.url }),
+        })) || [],
       }
     });
   } catch (error) {
-    return res.status(500).json({ message: "Database error", error: error.message });
+    return res.status(500).json({ message: "مشكله في الداتا بيز اخبر مطورين الموقع", error: error.message });
   }
 });
-const getMonth = async (req, res) => {
+const getMonth = asyncHand(async (req, res) => {
   const { deviceID, studentCode, studentGrade, id } = req.body;
   if (!deviceID || !studentCode || !studentGrade || !id) {
-    return res.status(400).json({ message: "Missing required fields" });
+    return res.status(400).json({ message: "ادخل جميع الحقول من فضلك " });
   }
   try {
     const student = await userData.findOne({ studentCode });
     if (!student) {
-      return res.status(404).json({ message: "Student not found" });
+      return res.status(404).json({ message: "لا يوجد طالب بهذا الكود" });
     }
     if (student.deviceID !== deviceID) {
       return res.status(403).json({
-        message: "You are logged in on another device! You can only purchase through your device.",
+        message: "انت مسجل دخول بهاتف اخر لايمكن اجراء عمليه شراء بهاتف مختلف ",
       });
     }
     if (req.session.studentCode !== studentCode || req.session.deviceID !== deviceID) {
-      return res.status(403).json({ message: "Session expired or invalid. Please log in again." });
+      return res.status(403).json({ message: "برجاء تسجيل دخول مره اخرى فتره التسجيل انتهت" });
     }
     if (Number(student.studentGrade) !== Number(studentGrade)) {
       return res.status(409).json({
-        message: "There's something wrong with your grade.",
+        message: "خطأ في مستواك ",
       });
     }
     const teacher = await adminData.findOne({ teacherID: student.assignedTeacher });
     if (!teacher) {
-      return res.status(403).json({ message: "Teacher not found" });
+      return res.status(403).json({ message: "مدرس غير موجود" });
     }
     const availableMonth = (Array.isArray(teacher.availableMonths) ? teacher.availableMonths : []).find(
       (month) => Number(month.id) === Number(id) && Number(month.grade) === Number(studentGrade)
     );
     if (!availableMonth) {
-      return res.status(404).json({ message: "Month not available for this grade" });
+      return res.status(404).json({ message: "هذا الشهر غير متاح لهذا المستوى" });
     }
     const monthCode = `.${id}.`;
     if (student.boughtMonths.includes(monthCode)) {
-      return res.status(409).json({ message: "You have already purchased this month." });
+      return res.status(409).json({ message: "انت بالفعل مشتري هذا الشهر" });
     }
     const studentCash = Number(student.studentCash);
     const monthPrice = Number(availableMonth.money);
     if (studentCash < monthPrice) {
       return res.status(403).json({
-        message: "You do not have enough balance. Please contact your teacher to recharge.",
+        message: "لا يوجد رصيد كافي برجاء شحن رصيد بأخبار المدرس الخاص بك",
       });
     }
     student.studentCash = String(studentCash - monthPrice);
     student.boughtMonths += monthCode;
     await student.save();
     return res.status(409).json({
-      message: "A new month has been added successfully.",
+      message: "تم شراء الشهر بنجاح",
       studentCash: student.studentCash,
       boughtMonths: student.boughtMonths,
     });
   } catch (error) {
-    return res.status(500).json({ message: "Server error", error: error.message });
+    return res.status(500).json({ message: "خطأ في النظام برجاء اخبار المطوريين ", error: error.message });
   }
+});
+
+const generateUniqueStudentCode = async () => {
+  let code;
+  let exists = true;
+  while (exists) {
+    code = Array.from({ length: 5 }, () => Math.floor(Math.random() * 10)).join('');
+    const existing = await userData.findOne({ studentCode: code });
+    if (!existing) exists = false;
+  }
+  return code;
 };
 
+const requestNewAdmission = asyncHand(async (req, res) => {
+  const { studentName, studentPhone, teacherCode, studentGrade , deviceID} = req.body;
+  if (!studentName || !studentPhone || !teacherCode || !studentGrade) {
+    return res.status(400).json({ message: "الرجاء ادخال جميع البيانات" });
+  }
 
-module.exports = { signIn, getMonth };
+  const studentCode = await generateUniqueStudentCode();
+
+  let studentCash = 0;
+  const newStudent = new userData({
+    deviceID: deviceID,
+    studentCode,
+    studentName: studentName,
+    studentNumber: encrypt(studentPhone).content,
+    studentGrade: studentGrade,
+    studentCash: studentCash,
+    boughtMonths: "",
+    assignedTeacher: teacherCode,
+    activateDate: "",
+    expireDate: "",
+    codeStatus: "Expired",
+    admissionStatus: "Waiting",
+
+  });
+  await newStudent.save();
+  return res.status(201).json({
+    message: "تم ارسال الطلب للمدرس وفي حاله انتظار الموافقه",
+    student: {
+      ...newStudent._doc,
+      studentNumber: decrypt({ content: newStudent.studentNumber })
+    }
+  });
+});
+module.exports = { requestNewAdmission, signIn, getMonth };
+
+
+

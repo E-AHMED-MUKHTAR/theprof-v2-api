@@ -52,6 +52,10 @@ const UserSchema = new mongoose.Schema({
         type: Array,
         require: true
     },
+     admissionStatus: {
+        type: String,
+        require: true
+    },
 }, { timestamps: true });
 module.exports = mongoose.model("profstudent", UserSchema)
 

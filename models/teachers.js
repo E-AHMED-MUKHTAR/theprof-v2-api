@@ -29,6 +29,7 @@ const teacherSliderSchema = new mongoose.Schema({
     url: String,
 }, { _id: false });
 const teacherNotificationsSchema = new mongoose.Schema({
+    id: Number,
     date: String,
     msg: String,
     img: String,

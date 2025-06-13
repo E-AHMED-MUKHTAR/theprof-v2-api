@@ -11,4 +11,9 @@ router
         "/BuyMonth",
         applicant.getMonth
     )
+router
+    .post(
+        "/Request/New/Acceptance",
+        applicant.requestNewAdmission
+    )
 module.exports = router
