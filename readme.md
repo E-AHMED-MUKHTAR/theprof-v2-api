@@ -22,21 +22,21 @@ A secure educational backend system designed for managing teachers and students,
 
 project-root/
 ├── controllers/
-│   ├── login.js          # Student sign-in & month purchase logic
-│   ├── applicant.js      # Student registration & advanced logic
-│   ├── admin.js          # Teacher registration & ID generation
-│   └── master.js         # Teacher dashboard features and controls
+│   ├── login.js         
+│   ├── applicant.js      
+│   ├── admin.js        
+│   └── master.js  
 ├── routes/
-│   ├── login.js          # Student sign-in & month purchase logic
-│   ├── applicant.js      # Student registration & advanced logic
-│   ├── admin.js          # Teacher registration & ID generation
-│   └── master.js         # Teacher dashboard features and controls
+│   ├── login.js        
+│   ├── applicant.js    
+│   ├── admin.js     
+│   └── master.js      
 ├── models/
-│   ├── users.js          # Student model
-│   └── teachers.js       # Teacher model
+│   ├── users.js
+│   └── teachers.js       
 ├── utilitie/
-│   └── cryptoUtil.js     # Custom encryption/decryption logic
-├── server.js             # Express server setup
+│   └── cryptoUtil.js     
+├── server.js           
 
  Features
 
