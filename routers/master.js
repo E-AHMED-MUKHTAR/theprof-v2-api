@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const master = require("../controllers/master");
-const isAuth = require("../middlewares/isAuth"); 
+const isAuth = require("../middlewares/reqSession"); 
 
 router.post("/login", master.login);
 
