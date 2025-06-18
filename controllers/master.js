@@ -244,6 +244,10 @@ if (!getYouTubeVideoId) {
 }
 const getYouTubeVideoDetails = async (videoId) => {
   const videoUrl = `https://www.youtube.com/watch?v=${videoId}`;
+  if (!videoUrl) {
+   return res.status(404).json({ message: "مشكله في  id get video" })
+}
+
   try {
     const response = await axios.get(videoUrl);
     const $ = cheerio.load(response.data);
