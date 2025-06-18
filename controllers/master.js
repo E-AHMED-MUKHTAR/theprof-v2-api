@@ -239,6 +239,9 @@ const getYouTubeVideoId = (url) => {
   const match = url.match(regex);
   return match ? match[1] : null;
 };
+if (!getYouTubeVideoId) {
+   return res.status(404).json({ message: "مشكله في  id get video" })
+}
 const getYouTubeVideoDetails = async (videoId) => {
   const videoUrl = `https://www.youtube.com/watch?v=${videoId}`;
   try {
@@ -253,7 +256,9 @@ const getYouTubeVideoDetails = async (videoId) => {
     return null;
   }
 };
-
+if (!getYouTubeVideoDetails) {
+   return res.status(404).json({ message: "مشكله في get video" })
+}
 
 
 const CreateLecture = asyncHand(async (req, res) => {
