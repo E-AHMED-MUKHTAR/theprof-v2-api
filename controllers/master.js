@@ -266,7 +266,7 @@ console.log(" videoDetails:", { title, description, img });
 
 // إنشاء محاضرة جديدة
 const CreateLecture = asyncHand(async (req, res) => {
-  console.log("📹 videoId:", videoId);
+
   const teacherID = req.session?.teacherID; // لو شغال بـ session - يفضل تغيره لـ JWT لو على Vercel
   const { grade, monthId, exams, pdf, url } = req.body;
 
@@ -279,6 +279,7 @@ const CreateLecture = asyncHand(async (req, res) => {
   }
 
   const videoId = getYouTubeVideoId(url);
+    console.log("📹 videoId:", videoId);
   if (!videoId) {
     return res.status(400).json({ message: "رابط يوتيوب غير صالح" });
   }
