@@ -45,11 +45,11 @@ const signIn = asyncHand(async (req, res) => {
         }
       }
     }
-    else{
+    else {
       res.status(500).json({
-      message: "خطأ غير معروف برجاء ابلاغ المطوريين"
-    })
-  }
+        message: "خطأ غير معروف برجاء ابلاغ المطوريين"
+      })
+    }
     findUser.deviceID = deviceID;
     await findUser.save();
     req.session.deviceID = deviceID;
@@ -88,7 +88,7 @@ const signIn = asyncHand(async (req, res) => {
         return Number(note.grade) === Number(studentGrade);
       });
     }
-    
+
     return res.status(200).json({
       message: "تم تسجيل الدخول بنجاح",
       data: {
@@ -179,7 +179,7 @@ const generateUniqueStudentCode = async () => {
 };
 
 const requestNewAdmission = asyncHand(async (req, res) => {
-  const { studentName, studentPhone, teacherCode, studentGrade , deviceID} = req.body;
+  const { studentName, studentPhone, teacherCode, studentGrade, deviceID } = req.body;
   if (!studentName || !studentPhone || !teacherCode || !studentGrade) {
     return res.status(400).json({ message: "الرجاء ادخال جميع البيانات" });
   }
@@ -211,7 +211,16 @@ const requestNewAdmission = asyncHand(async (req, res) => {
     }
   });
 });
-module.exports = { requestNewAdmission, signIn, getMonth };
+const signOut = (req, res) => {
+  req.session.destroy((err) => {
+    if (err) {
+      return res.status(500).json({ message: "حدث خطأ أثناء تسجيل الخروج" });
+    }
+    res.clearCookie("connect.sid");
+    return res.status(200).json({ message: "تم تسجيل الخروج بنجاح" });
+  });
+};
+module.exports = { requestNewAdmission, signIn, getMonth , signOut };
 
 
 

@@ -16,4 +16,9 @@ router
         "/Request/New/Acceptance",
         applicant.requestNewAdmission
     )
+router
+    .post(
+        "/signOut/exist/session/student",
+        applicant.signOut
+    )
 module.exports = router

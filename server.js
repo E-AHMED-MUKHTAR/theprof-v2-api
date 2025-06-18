@@ -13,6 +13,7 @@ app.use(
     secret: process.env.SESSION_SECRET || 'Amuk+++000',
     resave: false,
     saveUninitialized: true,
+    name: 'custom.sid',
     store: MongoStore.create({
       mongoUrl: process.env.DATABASE_CONNECTION,
       collectionName: 'sessions',

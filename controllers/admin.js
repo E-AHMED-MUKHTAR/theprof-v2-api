@@ -38,4 +38,13 @@ const add = asyncHand(async (req, res) => {
     return res.status(500).json({ message: "Failed to add teacher", error: error.message });
   }
 });
-module.exports = { add };
+const signOut = (req, res) => {
+  req.session.destroy((err) => {
+    if (err) {
+      return res.status(500).json({ message: "حدث خطأ أثناء تسجيل الخروج" });
+    }
+    res.clearCookie("connect.sid");
+    return res.status(200).json({ message: "تم تسجيل الخروج بنجاح" });
+  });
+};
+module.exports = { add , signOut };

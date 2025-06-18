@@ -257,7 +257,7 @@ const CreateLecture = asyncHand(async (req, res) => {
   }
 
   const videoId = getYouTubeVideoId(url);
-  console.log("📹 videoId:", videoId);
+  
   if (!videoId) {
     return res.status(400).json({ message: "رابط يوتيوب غير صالح" });
   }
@@ -548,6 +548,15 @@ const acceptOneRequest = asyncHand(async (req, res) => {
     requested: student
   });
 });
+const logout = (req, res) => {
+  req.session.destroy((err) => {
+    if (err) {
+      return res.status(500).json({ message: "حدث خطأ أثناء تسجيل الخروج" });
+    }
+    res.clearCookie("connect.sid");
+    return res.status(200).json({ message: "تم تسجيل الخروج بنجاح" });
+  });
+};
 
 module.exports = {
   login,
@@ -563,7 +572,8 @@ module.exports = {
   deleteSlider,
   deleteNotification,
   requestedList,
-  acceptOneRequest
+  acceptOneRequest,
+  logout
 }
 
 
