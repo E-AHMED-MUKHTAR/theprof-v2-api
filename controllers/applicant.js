@@ -5,7 +5,7 @@ const adminData = require('../models/teachers');
 const dayjs = require("dayjs");
 const customParseFormat = require("dayjs/plugin/customParseFormat");
 dayjs.extend(customParseFormat);
-const { encrypt, decrypt } = require('../utilitie/cryptoUtil');
+const { encrypt, decrypt } = require('../utilities/cryptoUtil');
 
 const moment = require('moment');
 const signIn = asyncHand(async (req, res) => {
