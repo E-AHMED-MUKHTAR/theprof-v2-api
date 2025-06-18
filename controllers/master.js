@@ -321,10 +321,6 @@ const CreateLecture = asyncHand(async (req, res) => {
 });
 
 
-
-
-
-
 const CreateNotification = asyncHand(async (req, res) => {
   const teacherID = req.session.teacherID;
   const { msg, img, grade, ti, vi } = req.body;
@@ -540,7 +536,7 @@ const acceptOneRequest = asyncHand(async (req, res) => {
   const newExpireDate = moment().add(1, 'month').format("DD/MM/YYYY - hh:mm:ss A");
 
   const newStatus = "accepted"
-const newCodeStatus= "Active"
+  const newCodeStatus = "Active"
 
   student.admissionStatus = newStatus;
   student.codeStatus = newCodeStatus;
