@@ -256,7 +256,7 @@ const getYouTubeVideoDetails = async (videoId) => {
     const img = $('link[rel="image_src"]').attr('href');
 
     if (!title || !description || !img) return null;
-
+console.log(" videoDetails:", { title, description, img });
     return { title, description, img };
   } catch (error) {
     console.error("خطأ في جلب الفيديو:", error.message);
@@ -266,6 +266,7 @@ const getYouTubeVideoDetails = async (videoId) => {
 
 // إنشاء محاضرة جديدة
 const CreateLecture = asyncHand(async (req, res) => {
+  console.log("📹 videoId:", videoId);
   const teacherID = req.session?.teacherID; // لو شغال بـ session - يفضل تغيره لـ JWT لو على Vercel
   const { grade, monthId, exams, pdf, url } = req.body;
 
