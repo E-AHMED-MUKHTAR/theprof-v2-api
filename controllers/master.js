@@ -245,7 +245,7 @@ if (!getYouTubeVideoId) {
 const getYouTubeVideoDetails = async (videoId) => {
   const videoUrl = `https://www.youtube.com/watch?v=${videoId}`;
   if (!videoUrl) {
-   return res.status(404).json({ message: "مشكله في  id get video" })
+   return res.status(404).json({ message: "مشكله في  iget video" })
 }
 
   try {
@@ -256,8 +256,8 @@ const getYouTubeVideoDetails = async (videoId) => {
     const img = $('link[rel="image_src"]').attr('href');
     return { title, description, img };
   } catch (error) {
-    console.error("Error scraping video:", error.message);
-    return null;
+   return res.status(404).json({ message: "مشكله في  iget video" })
+    // return null;
   }
 };
 if (!getYouTubeVideoDetails) {
