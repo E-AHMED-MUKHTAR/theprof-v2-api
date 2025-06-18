@@ -234,7 +234,7 @@ const CreateMonth = asyncHand(async (req, res) => {
 // error on vercel 
 const axios = require('axios');
 const cheerio = require('cheerio');
-
+const {getYouTubeVideoDetails} =require("../utilitie/getYouTubeVideoDetails")
 // استخراج ID من رابط اليوتيوب
 const getYouTubeVideoId = (url) => {
   const regex = /(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/|v\/))([\w-]{11})/;
@@ -242,36 +242,42 @@ const getYouTubeVideoId = (url) => {
   return match ? match[1] : null;
 };
 
-// جلب بيانات الفيديو من YouTube
-const getYouTubeVideoDetails = async (videoId) => {
-  if (!videoId) return null;
+// // جلب بيانات الفيديو من YouTube
+// const getYouTubeVideoDetails = async (videoId) => {
+//   if (!videoId) return null;
 
-  const videoUrl = `https://www.youtube.com/watch?v=${videoId}`;
-  try {
-    const response = await axios.get(videoUrl);
-    const $ = cheerio.load(response.data);
+//   const videoUrl = `https://www.youtube.com/watch?v=${videoId}`;
+//   try {
+//     const response = await axios.get(videoUrl);
+//     const $ = cheerio.load(response.data);
 
-    const title = $('meta[name="title"]').attr('content');
-    const description = $('meta[name="description"]').attr('content');
-    const img = $('link[rel="image_src"]').attr('href');
+//     const title = $('meta[name="title"]').attr('content');
+//     const description = $('meta[name="description"]').attr('content');
+//     const img = $('link[rel="image_src"]').attr('href');
 
-    if (!title || !description || !img) return null;
-console.log(" videoDetails:", { title, description, img });
-    return { title, description, img };
-  } catch (error) {
-    console.error("خطأ في جلب الفيديو:", error.message);
-    return null;
-  }
-};
+//     if (!title || !description || !img) return null;
+// console.log(" videoDetails:", { title, description, img });
+//     return { title, description, img };
+//   } catch (error) {
+//     console.error("خطأ في جلب الفيديو:", error.message);
+//     return null;
+//   }
+// };
 
-// إنشاء محاضرة جديدة
+// controllers/master.js
+
+const asyncHand = require("express-async-handler");
+const adminData = require("../models/adminModel");
+const getYouTubeVideoDetails = require("../utils/getYouTubeVideoDetails");
+const getYouTubeVideoId = require("../utils/getYouTubeVideoId");
+const { encrypt, decrypt } = require("../utils/cryptoUtil");
+
 const CreateLecture = asyncHand(async (req, res) => {
-
-  const teacherID = req.session?.teacherID; // لو شغال بـ session - يفضل تغيره لـ JWT لو على Vercel
+  const teacherID = req.session?.teacherID;
   const { grade, monthId, exams, pdf, url } = req.body;
 
   if (!grade || !monthId || !exams || !pdf || !url) {
-    return res.status(400).json({ message: "الرجاء ادخال جميع البيانات" });
+    return res.status(400).json({ message: "الرجاء إدخال جميع البيانات" });
   }
 
   if (!teacherID) {
@@ -279,13 +285,13 @@ const CreateLecture = asyncHand(async (req, res) => {
   }
 
   const videoId = getYouTubeVideoId(url);
-    console.log("📹 videoId:", videoId);
+  console.log("📹 videoId:", videoId);
   if (!videoId) {
     return res.status(400).json({ message: "رابط يوتيوب غير صالح" });
   }
 
   const videoDetails = await getYouTubeVideoDetails(videoId);
-  if (!videoDetails) {
+  if (!videoDetails || !videoDetails.title || !videoDetails.img) {
     return res.status(400).json({ message: "تعذر جلب بيانات الفيديو" });
   }
 
@@ -306,16 +312,16 @@ const CreateLecture = asyncHand(async (req, res) => {
   }
 
   const newLecture = {
-    title: encrypt(videoDetails.title).content,
-    description: encrypt(videoDetails.description).content,
-    img: encrypt(videoDetails.img).content,
+    title: encrypt(videoDetails.title)?.content,
+    description: encrypt(videoDetails.description)?.content,
+    img: encrypt(videoDetails.img)?.content,
     id,
     videoId,
     grade,
     monthId,
     exams,
     pdf,
-    url: encrypt(url).content,
+    url: encrypt(url)?.content,
   };
 
   const updateResult = await adminData.findOneAndUpdate(
@@ -341,6 +347,85 @@ const CreateLecture = asyncHand(async (req, res) => {
     availableClasses: decryptedClasses,
   });
 });
+
+
+
+// const CreateLecture = asyncHand(async (req, res) => {
+
+//   const teacherID = req.session?.teacherID; // لو شغال بـ session - يفضل تغيره لـ JWT لو على Vercel
+//   const { grade, monthId, exams, pdf, url } = req.body;
+
+//   if (!grade || !monthId || !exams || !pdf || !url) {
+//     return res.status(400).json({ message: "الرجاء ادخال جميع البيانات" });
+//   }
+
+//   if (!teacherID) {
+//     return res.status(401).json({ message: "لا يوجد جلسة" });
+//   }
+
+//   const videoId = getYouTubeVideoId(url);
+//     console.log("📹 videoId:", videoId);
+//   if (!videoId) {
+//     return res.status(400).json({ message: "رابط يوتيوب غير صالح" });
+//   }
+
+//   const videoDetails = await getYouTubeVideoDetails(videoId);
+//   if (!videoDetails) {
+//     return res.status(400).json({ message: "تعذر جلب بيانات الفيديو" });
+//   }
+
+//   const teacher = await adminData.findOne({ teacherID });
+//   if (!teacher) {
+//     return res.status(404).json({ message: "المعلم غير موجود" });
+//   }
+
+//   let id = 1;
+//   if (teacher.availableClasses && teacher.availableClasses.length > 0) {
+//     const sameGradeLectures = teacher.availableClasses.filter(
+//       (cls) => cls.grade === grade
+//     );
+//     if (sameGradeLectures.length > 0) {
+//       const lastId = Math.max(...sameGradeLectures.map((cls) => cls.id));
+//       id = lastId + 1;
+//     }
+//   }
+
+//   const newLecture = {
+//     title: encrypt(videoDetails.title).content,
+//     description: encrypt(videoDetails.description).content,
+//     img: encrypt(videoDetails.img).content,
+//     id,
+//     videoId,
+//     grade,
+//     monthId,
+//     exams,
+//     pdf,
+//     url: encrypt(url).content,
+//   };
+
+//   const updateResult = await adminData.findOneAndUpdate(
+//     { teacherID },
+//     { $push: { availableClasses: newLecture } },
+//     { new: true, runValidators: true }
+//   );
+
+//   if (!updateResult) {
+//     return res.status(500).json({ message: "خطأ أثناء حفظ المحاضرة في قاعدة البيانات" });
+//   }
+
+//   const decryptedClasses = updateResult.availableClasses.map(cls => ({
+//     ...cls._doc,
+//     title: decrypt({ content: cls.title }),
+//     description: decrypt({ content: cls.description }),
+//     img: decrypt({ content: cls.img }),
+//     url: decrypt({ content: cls.url }),
+//   }));
+
+//   return res.status(201).json({
+//     message: "تم الإضافة بنجاح",
+//     availableClasses: decryptedClasses,
+//   });
+// });
 
 // const getYouTubeVideoId = (url) => {
 //   const regex = /(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/|v\/))([\w-]{11})/;
