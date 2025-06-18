@@ -1,7 +1,7 @@
 const asyncHand = require('express-async-handler');
 const adminData = require('../models/teachers');
 const bcrypt = require('bcrypt');
-const { encrypt, decrypt } = require('../utilitie/cryptoUtil');
+const { encrypt, decrypt } = require('../utilities/cryptoUtil');
 const generateTeacherID = () => {
   let teacherID = "";
   while (teacherID.length < 4) {
