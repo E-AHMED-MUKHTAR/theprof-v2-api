@@ -230,6 +230,8 @@ const CreateMonth = asyncHand(async (req, res) => {
     availableMonths: updateResult.availableMonths
   });
 });
+
+// error on vercel 
 const axios = require('axios');
 const cheerio = require('cheerio');
 const getYouTubeVideoId = (url) => {
@@ -251,6 +253,9 @@ const getYouTubeVideoDetails = async (videoId) => {
     return null;
   }
 };
+
+
+
 const CreateLecture = asyncHand(async (req, res) => {
   const teacherID = req.session.teacherID;
   const { grade, monthId, exams, pdf, url } = req.body;
@@ -299,6 +304,9 @@ const CreateLecture = asyncHand(async (req, res) => {
     { $push: { availableClasses: newLecture } },
     { new: true, runValidators: true }
   );
+   if (!updateResult) {
+    return res.status(404).json({ message: " داتا بيز في البوش" });
+  }
   const decryptedClasses = updateResult.availableClasses.map(cls => ({
     ...cls._doc,
     title: decrypt({ content: cls.title }),
@@ -306,11 +314,17 @@ const CreateLecture = asyncHand(async (req, res) => {
     img: decrypt({ content: cls.img }),
     url: decrypt({ content: cls.url }),
   }));
+   if (!decryptedClasses) {
+    return res.status(404).json({ message: " ديكريبشن داتا بيز  " });
+  }
   return res.status(201).json({
     message: "تم الإضافة",
     availableClasses: decryptedClasses
   });
 });
+
+
+
 const CreateNotification = asyncHand(async (req, res) => {
   const teacherID = req.session.teacherID;
   const { msg, img, grade, ti, vi } = req.body;
