@@ -234,58 +234,64 @@ const CreateMonth = asyncHand(async (req, res) => {
 // error on vercel 
 const axios = require('axios');
 const cheerio = require('cheerio');
+
+// استخراج ID من رابط اليوتيوب
 const getYouTubeVideoId = (url) => {
   const regex = /(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/|v\/))([\w-]{11})/;
   const match = url.match(regex);
   return match ? match[1] : null;
 };
-if (!getYouTubeVideoId) {
-   return res.status(404).json({ message: "مشكله في  id get video" })
-}
-const getYouTubeVideoDetails = async (videoId) => {
-  const videoUrl = `https://www.youtube.com/watch?v=${videoId}`;
-  if (!videoUrl) {
-   return res.status(404).json({ message: "مشكله في  iget video" })
-}
 
+// جلب بيانات الفيديو من YouTube
+const getYouTubeVideoDetails = async (videoId) => {
+  if (!videoId) return null;
+
+  const videoUrl = `https://www.youtube.com/watch?v=${videoId}`;
   try {
     const response = await axios.get(videoUrl);
     const $ = cheerio.load(response.data);
+
     const title = $('meta[name="title"]').attr('content');
     const description = $('meta[name="description"]').attr('content');
     const img = $('link[rel="image_src"]').attr('href');
+
+    if (!title || !description || !img) return null;
+
     return { title, description, img };
   } catch (error) {
-   return res.status(404).json({ message: "مشكله في  iget video" })
-    // return null;
+    console.error("خطأ في جلب الفيديو:", error.message);
+    return null;
   }
 };
-if (!getYouTubeVideoDetails) {
-   return res.status(404).json({ message: "مشكله في get video" })
-}
 
-
+// إنشاء محاضرة جديدة
 const CreateLecture = asyncHand(async (req, res) => {
-  const teacherID = req.session.teacherID;
+  const teacherID = req.session?.teacherID; // لو شغال بـ session - يفضل تغيره لـ JWT لو على Vercel
   const { grade, monthId, exams, pdf, url } = req.body;
+
   if (!grade || !monthId || !exams || !pdf || !url) {
     return res.status(400).json({ message: "الرجاء ادخال جميع البيانات" });
   }
+
   if (!teacherID) {
-    return res.status(401).json({ message: " لا يوجد جلسة" });
+    return res.status(401).json({ message: "لا يوجد جلسة" });
   }
+
   const videoId = getYouTubeVideoId(url);
   if (!videoId) {
     return res.status(400).json({ message: "رابط يوتيوب غير صالح" });
   }
+
   const videoDetails = await getYouTubeVideoDetails(videoId);
   if (!videoDetails) {
     return res.status(400).json({ message: "تعذر جلب بيانات الفيديو" });
   }
+
   const teacher = await adminData.findOne({ teacherID });
   if (!teacher) {
-    return res.status(404).json({ message: " المعلم غير موجود" });
+    return res.status(404).json({ message: "المعلم غير موجود" });
   }
+
   let id = 1;
   if (teacher.availableClasses && teacher.availableClasses.length > 0) {
     const sameGradeLectures = teacher.availableClasses.filter(
@@ -296,6 +302,7 @@ const CreateLecture = asyncHand(async (req, res) => {
       id = lastId + 1;
     }
   }
+
   const newLecture = {
     title: encrypt(videoDetails.title).content,
     description: encrypt(videoDetails.description).content,
@@ -308,14 +315,17 @@ const CreateLecture = asyncHand(async (req, res) => {
     pdf,
     url: encrypt(url).content,
   };
+
   const updateResult = await adminData.findOneAndUpdate(
     { teacherID },
     { $push: { availableClasses: newLecture } },
     { new: true, runValidators: true }
   );
-   if (!updateResult) {
-    return res.status(404).json({ message: " داتا بيز في البوش" });
+
+  if (!updateResult) {
+    return res.status(500).json({ message: "خطأ أثناء حفظ المحاضرة في قاعدة البيانات" });
   }
+
   const decryptedClasses = updateResult.availableClasses.map(cls => ({
     ...cls._doc,
     title: decrypt({ content: cls.title }),
@@ -323,14 +333,111 @@ const CreateLecture = asyncHand(async (req, res) => {
     img: decrypt({ content: cls.img }),
     url: decrypt({ content: cls.url }),
   }));
-   if (!decryptedClasses) {
-    return res.status(404).json({ message: " ديكريبشن داتا بيز  " });
-  }
+
   return res.status(201).json({
-    message: "تم الإضافة",
-    availableClasses: decryptedClasses
+    message: "تم الإضافة بنجاح",
+    availableClasses: decryptedClasses,
   });
 });
+
+// const getYouTubeVideoId = (url) => {
+//   const regex = /(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/|v\/))([\w-]{11})/;
+//   const match = url.match(regex);
+//   return match ? match[1] : null;
+// };
+// if (!getYouTubeVideoId) {
+//    return res.status(404).json({ message: "مشكله في  id get video" })
+// }
+// const getYouTubeVideoDetails = async (videoId) => {
+//   const videoUrl = `https://www.youtube.com/watch?v=${videoId}`;
+//   if (!videoUrl) {
+//    return res.status(404).json({ message: "مشكله في  iget video" })
+// }
+
+//   try {
+//     const response = await axios.get(videoUrl);
+//     const $ = cheerio.load(response.data);
+//     const title = $('meta[name="title"]').attr('content');
+//     const description = $('meta[name="description"]').attr('content');
+//     const img = $('link[rel="image_src"]').attr('href');
+//     return { title, description, img };
+//   } catch (error) {
+//    return res.status(404).json({ message: "مشكله في  iget video" })
+//     // return null;
+//   }
+// };
+// if (!getYouTubeVideoDetails) {
+//    return res.status(404).json({ message: "مشكله في get video" })
+// }
+
+
+// const CreateLecture = asyncHand(async (req, res) => {
+//   const teacherID = req.session.teacherID;
+//   const { grade, monthId, exams, pdf, url } = req.body;
+//   if (!grade || !monthId || !exams || !pdf || !url) {
+//     return res.status(400).json({ message: "الرجاء ادخال جميع البيانات" });
+//   }
+//   if (!teacherID) {
+//     return res.status(401).json({ message: " لا يوجد جلسة" });
+//   }
+//   const videoId = getYouTubeVideoId(url);
+//   if (!videoId) {
+//     return res.status(400).json({ message: "رابط يوتيوب غير صالح" });
+//   }
+//   const videoDetails = await getYouTubeVideoDetails(videoId);
+//   if (!videoDetails) {
+//     return res.status(400).json({ message: "تعذر جلب بيانات الفيديو" });
+//   }
+//   const teacher = await adminData.findOne({ teacherID });
+//   if (!teacher) {
+//     return res.status(404).json({ message: " المعلم غير موجود" });
+//   }
+//   let id = 1;
+//   if (teacher.availableClasses && teacher.availableClasses.length > 0) {
+//     const sameGradeLectures = teacher.availableClasses.filter(
+//       (cls) => cls.grade === grade
+//     );
+//     if (sameGradeLectures.length > 0) {
+//       const lastId = Math.max(...sameGradeLectures.map((cls) => cls.id));
+//       id = lastId + 1;
+//     }
+//   }
+//   const newLecture = {
+//     title: encrypt(videoDetails.title).content,
+//     description: encrypt(videoDetails.description).content,
+//     img: encrypt(videoDetails.img).content,
+//     id,
+//     videoId,
+//     grade,
+//     monthId,
+//     exams,
+//     pdf,
+//     url: encrypt(url).content,
+//   };
+//   const updateResult = await adminData.findOneAndUpdate(
+//     { teacherID },
+//     { $push: { availableClasses: newLecture } },
+//     { new: true, runValidators: true }
+//   );
+//    if (!updateResult) {
+//     return res.status(404).json({ message: " داتا بيز في البوش" });
+//   }
+//   const decryptedClasses = updateResult.availableClasses.map(cls => ({
+//     ...cls._doc,
+//     title: decrypt({ content: cls.title }),
+//     description: decrypt({ content: cls.description }),
+//     img: decrypt({ content: cls.img }),
+//     url: decrypt({ content: cls.url }),
+//     // 
+//   }));
+//    if (!decryptedClasses) {
+//     return res.status(404).json({ message: " ديكريبشن داتا بيز  " });
+//   }
+//   return res.status(201).json({
+//     message: "تم الإضافة",
+//     availableClasses: decryptedClasses
+//   });
+// });
 
 
 
